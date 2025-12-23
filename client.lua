@@ -17,6 +17,141 @@
 
 
 
+-- TOOLBOX BLIPS INTEGRATION
+local DutyActive = false
+local SelectedBlipTag = nil
+local AllowedBlipTags = {}
+local DutyStartTime = nil
+local DutyBlips = {}
+_G.SelectedBlipTag = SelectedBlipTag
+
+-- TOOLBOX BLIPS INTEGRATION
+local function NotifyDuty(msg)
+    Notify(msg)
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+function GetAllowedBlipTags()
+    return AllowedBlipTags
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+function SetSelectedBlipTag(tagName)
+    for _, tag in ipairs(AllowedBlipTags) do
+        if tag.name == tagName then
+            SelectedBlipTag = tagName
+            _G.SelectedBlipTag = SelectedBlipTag
+            return true
+        end
+    end
+    return false
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+local function RequestBlipTags()
+    TriggerServerEvent('toolbox:requestBlipTags')
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+RegisterNetEvent('toolbox:blipTags')
+AddEventHandler('toolbox:blipTags', function(tags)
+    AllowedBlipTags = tags or {}
+    if #AllowedBlipTags > 0 and not SelectedBlipTag then
+        SelectedBlipTag = AllowedBlipTags[1].name
+    end
+    _G.SelectedBlipTag = SelectedBlipTag
+end)
+
+-- TOOLBOX BLIPS INTEGRATION
+local function PerformDutyToggle()
+    if not SelectedBlipTag then
+        NotifyDuty('~r~Select a blip tag first')
+        return
+    end
+    TriggerServerEvent('toolbox:toggleDuty', SelectedBlipTag)
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+RegisterNetEvent('toolbox:dutyState')
+AddEventHandler('toolbox:dutyState', function(state, tag)
+    DutyActive = state
+    if state then
+        DutyStartTime = GetGameTimer()
+        NotifyDuty('~g~Duty Enabled [' .. tag .. ']')
+        if tag == 'lafd' then
+            FireOnduty = true
+            LEOOnduty = false
+        else
+            LEOOnduty = true
+            FireOnduty = false
+        end
+    else
+        NotifyDuty('~o~Duty Disabled')
+        DutyStartTime = nil
+        LEOOnduty = false
+        FireOnduty = false
+    end
+end)
+
+-- TOOLBOX BLIPS INTEGRATION
+RegisterNetEvent('toolbox:dutyError')
+AddEventHandler('toolbox:dutyError', function(msg)
+    NotifyDuty('~r~' .. msg)
+end)
+
+-- TOOLBOX BLIPS INTEGRATION
+Citizen.CreateThread(function()
+    RequestBlipTags()
+    while true do
+        Citizen.Wait(Config.BlipUpdateInterval)
+        if DutyActive then
+            local coords = GetEntityCoords(PlayerPedId())
+            TriggerServerEvent('toolbox:updateDutyCoords', {x = coords.x, y = coords.y, z = coords.z, heading = GetEntityHeading(PlayerPedId())})
+        end
+    end
+end)
+
+-- TOOLBOX BLIPS INTEGRATION
+local function ClearDutyBlips()
+    for id, blip in pairs(DutyBlips) do
+        RemoveBlip(blip)
+        DutyBlips[id] = nil
+    end
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+RegisterNetEvent('eblips:updateAll')
+AddEventHandler('eblips:updateAll', function(list)
+    ClearDutyBlips()
+    if not list then return end
+    local myId = GetPlayerServerId(PlayerId())
+    for _, info in ipairs(list) do
+        if info.id ~= myId then
+            local blip = AddBlipForCoord(info.coords.x, info.coords.y, info.coords.z)
+            SetBlipSprite(blip, 1)
+            SetBlipColour(blip, info.colour or 0)
+            SetBlipDisplay(blip, 4)
+            SetBlipScale(blip, 0.85)
+            SetBlipAsShortRange(blip, true)
+            SetBlipShowCone(blip, true)
+            BeginTextCommandSetBlipName('STRING')
+            AddTextComponentString(info.name)
+            EndTextCommandSetBlipName(blip)
+            DutyBlips[info.id] = blip
+        end
+    end
+end)
+
+-- TOOLBOX BLIPS INTEGRATION
+RegisterNetEvent('eblips:remove')
+AddEventHandler('eblips:remove', function(id)
+    if DutyBlips[id] then
+        RemoveBlip(DutyBlips[id])
+        DutyBlips[id] = nil
+    end
+end)
+
+
 --Dragging Event
 local Drag = false
 local OfficerDrag = -1
@@ -502,15 +637,6 @@ end)
 
 
 
---Duty Permission Checks
-local DutyPermsResults = {}
-RegisterNetEvent('SEM_InteractionMenu:DutyPermsResult')
-AddEventHandler('SEM_InteractionMenu:DutyPermsResult', function(Department, Allowed)
-    DutyPermsResults[Department] = Allowed
-end)
-
-
-
 --Emote
 Citizen.CreateThread(function()
     while true do
@@ -565,117 +691,14 @@ Citizen.CreateThread(function()
         TriggerEvent('chat:addSuggestion', '/radar', 'Toggle Radar Menu')
     end
 
-    if Config.LEOAccess == 3 or Config.LEOAccess == 5 or Config.FireAccess == 3 or Config.FireAccess == 5 then
-        if Config.OndutyPSWDActive then
-            TriggerEvent('chat:addSuggestion', '/onduty', 'Enable Department Menu (lapd/lasd/chp/fire)', {{name = 'Department', help = 'lapd / lasd / chp / fire'}, {name = 'Password', help = 'Onduty Password'}})
-            TriggerEvent('chat:addSuggestion', '/duty', 'Enable Department Menu (lapd/lasd/chp/fire)', {{name = 'Department', help = 'lapd / lasd / chp / fire'}, {name = 'Password', help = 'Onduty Password'}})
-        else
-            TriggerEvent('chat:addSuggestion', '/onduty', 'Enable Department Menu (lapd/lasd/chp/fire)', {{name = 'Department', help = 'lapd / lasd / chp / fire'}})
-            TriggerEvent('chat:addSuggestion', '/duty', 'Enable Department Menu (lapd/lasd/chp/fire)', {{name = 'Department', help = 'lapd / lasd / chp / fire'}})
-        end
-    else
-        TriggerEvent('chat:removeSuggestion', '/onduty')
-        TriggerEvent('chat:removeSuggestion', '/duty')
-    end
+    TriggerEvent('chat:addSuggestion', '/duty', 'Toggle duty for your assigned blip tag')
 end)
 
 LEOOnduty = false
 FireOnduty = false
-local ValidLEODepartments = {
-    lapd = true,
-    lasd = true,
-    chp = true,
-}
 
-local function HasDutyPermission(Department)
-    local Dept = (Department or ''):lower()
-    DutyPermsResults[Dept] = nil
-    TriggerServerEvent('SEM_InteractionMenu:CheckDutyPerms', Dept)
-
-    local Timeout = GetGameTimer() + 2000
-    while DutyPermsResults[Dept] == nil and GetGameTimer() < Timeout do
-        Citizen.Wait(0)
-    end
-
-    return DutyPermsResults[Dept] == true
-end
-
-local function HandleOndutyCommand(args)
-    if Config.LEOAccess == 3 or Config.LEOAccess == 5 or Config.FireAccess == 3 or Config.FireAccess == 5 then
-        if args[1] == nil then
-            Notify('~r~Invalid Department!')
-            return
-        end
-        local Department = args[1]:lower()
-
-        if ValidLEODepartments[Department] then
-            if not HasDutyPermission(Department) then
-                Notify('~r~Insufficient Permissions')
-                return
-            end
-        elseif Department == 'fire' then
-            if Config.FireAccess == 0 then
-                Notify('~r~Invalid Department!')
-                return
-            end
-            if not HasDutyPermission(Department) then
-                Notify('~r~Insufficient Permissions')
-                return
-            end
-        else
-            Notify('~r~Invalid Department!')
-            return
-        end
-
-        if Config.OndutyPSWDActive then
-            if args[2] == Config.OndutyPSWD then
-                if ValidLEODepartments[Department] then
-                    LEOOnduty = not LEOOnduty
-                    if LEOOnduty then
-                        Notify('~g~You are onduty as ' .. Department:upper())
-                    else
-                        Notify('~o~You are no longer onduty as ' .. Department:upper())
-                    end
-                elseif Department == 'fire' then
-                    FireOnduty = not FireOnduty
-                    if FireOnduty == true then
-                        Notify('~g~You are onduty as an Firefighter')
-                    else
-                        Notify('~o~You are no longer onduty as an Firefighter')
-                    end
-                else
-                    Notify('~r~Invalid Department!')
-                end
-            else
-                Notify('~r~Incorrect Password')
-            end
-        else
-            if ValidLEODepartments[Department] then
-                LEOOnduty = not LEOOnduty
-                if LEOOnduty then
-                    Notify('~g~You are onduty as ' .. Department:upper())
-                else
-                    Notify('~o~You are no longer onduty as ' .. Department:upper())
-                end
-            elseif Department == 'fire' then
-                FireOnduty = not FireOnduty
-                if FireOnduty == true then
-                    Notify('~g~You are onduty as an Firefighter')
-                else
-                    Notify('~o~You are no longer onduty as an Firefighter')
-                end
-            else
-                Notify('~r~Invalid Department!')
-            end
-        end
-    end
-end
-
-RegisterCommand('onduty', function(source, args, rawCommand)
-    HandleOndutyCommand(args)
-end)
 RegisterCommand('duty', function(source, args, rawCommand)
-    HandleOndutyCommand(args)
+    PerformDutyToggle()
 end)
 
 function IsOndutyLEO()

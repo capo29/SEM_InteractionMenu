@@ -56,6 +56,30 @@ Config.MenuTitle = 0
 Config.MenuTitleCustom = 'Custom Menu Title'
 
 
+---------------------------------------------------------------
+--                                                           --
+--               Toolbox Emergency Blips Config             --
+--                                                           --
+---------------------------------------------------------------
+
+-- TOOLBOX BLIPS INTEGRATION
+-- Discord Webhook URL for duty logs (embeds)
+Config.DiscordDutyWebhook = ''
+
+-- TOOLBOX BLIPS INTEGRATION
+-- Blip tags and ACE permissions (DiscordAcePerms / Badger_Discord_API compatible)
+-- name = internal tag, label = menu label, ace = permission string, colour = blip colour id
+Config.BlipTags = {
+    {name = 'lspd', label = 'LSPD', ace = 'toolbox.blips.lspd', colour = 29},
+    {name = 'chp', label = 'CHP', ace = 'toolbox.blips.chp', colour = 38},
+    {name = 'lafd', label = 'LAFD', ace = 'toolbox.blips.lafd', colour = 1},
+}
+
+-- TOOLBOX BLIPS INTEGRATION
+-- Blip update interval (ms) for clients to refresh duty blips
+Config.BlipUpdateInterval = 5000
+
+
 
 
 

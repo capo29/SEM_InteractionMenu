@@ -54,6 +54,34 @@ function Menu()
 	
 	MainMenu:SetMenuWidthOffset(Config.MenuWidth)	
 	_MenuPool:ControlDisablingEnabled(false)
+    -- TOOLBOX BLIPS INTEGRATION
+    local AllowedBlipTags = GetAllowedBlipTags()
+    if #AllowedBlipTags > 0 then
+        local TagLabels = {}
+        local DefaultIndex = 1
+        for idx, Tag in ipairs(AllowedBlipTags) do
+            table.insert(TagLabels, Tag.label)
+            if Tag.name == SelectedBlipTag then
+                DefaultIndex = idx
+            end
+        end
+        local BlipMenu = _MenuPool:AddSubMenu(MainMenu, 'Emergency Blips', '', true)
+        BlipMenu:SetMenuWidthOffset(Config.MenuWidth)
+            local ToggleDuty = NativeUI.CreateItem('Toggle Duty', 'Toggle duty status')
+            local SelectTag = NativeUI.CreateListItem('Select Blip Tag', TagLabels, DefaultIndex, 'Choose your duty blip tag')
+            BlipMenu:AddItem(ToggleDuty)
+            BlipMenu:AddItem(SelectTag)
+            ToggleDuty.Activated = function(ParentMenu, SelectedItem)
+                PerformDutyToggle()
+            end
+            BlipMenu.OnListSelect = function(sender, item, index)
+                if item == SelectTag then
+                    local tagName = AllowedBlipTags[index].name
+                    SetSelectedBlipTag(tagName)
+                end
+            end
+    end
+
 	_MenuPool:MouseControlsEnabled(false)
 
 

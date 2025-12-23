@@ -19,6 +19,180 @@ AddEventHandler('SEM_InteractionMenu:GlobalChat', function(Color, Prefix, Messag
 	TriggerClientEvent('chatMessage', -1, Prefix, Color, Message)
 end)
 
+-- TOOLBOX BLIPS INTEGRATION
+local DutyPlayers = {}
+
+-- TOOLBOX BLIPS INTEGRATION
+local function GetIdentifier(source, prefix)
+    local identifiers = GetPlayerIdentifiers(source)
+    for _, id in ipairs(identifiers) do
+        if string.sub(id, 1, string.len(prefix)) == prefix then
+            return id
+        end
+    end
+    return nil
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+local function GetDiscordId(source)
+    local identifier = GetIdentifier(source, 'discord:')
+    if identifier then
+        return string.sub(identifier, 9)
+    end
+    return nil
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+local function BuildDutyEmbed(color, title, fields)
+    return {
+        username = 'Toolbox Duty Logs',
+        embeds = {{
+            title = title,
+            color = color,
+            fields = fields,
+            footer = { text = os.date('%Y-%m-%d %H:%M:%S') }
+        }}
+    }
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+local function SendDutyLog(payload)
+    if Config.DiscordDutyWebhook == nil or Config.DiscordDutyWebhook == '' then
+        return
+    end
+    PerformHttpRequest(Config.DiscordDutyWebhook, function() end, 'POST', json.encode(payload), {['Content-Type'] = 'application/json'})
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+local function GetAllowedBlipTags(source)
+    local allowed = {}
+    for _, tag in ipairs(Config.BlipTags) do
+        if IsPlayerAceAllowed(source, tag.ace) then
+            table.insert(allowed, tag)
+        end
+    end
+    return allowed
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+local function BroadcastBlips()
+    local payload = {}
+    for id, info in pairs(DutyPlayers) do
+        if info.coords then
+            table.insert(payload, {
+                id = id,
+                name = info.label .. ' | ' .. GetPlayerName(id),
+                colour = info.colour,
+                coords = info.coords,
+                tag = info.name
+            })
+        end
+    end
+    TriggerClientEvent('eblips:updateAll', -1, payload)
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+local function RemoveDutyPlayer(id, logOut)
+    local info = DutyPlayers[id]
+    if not info then return end
+    DutyPlayers[id] = nil
+    TriggerClientEvent('eblips:remove', -1, id)
+
+    if logOut then
+        local endTime = os.time()
+        local minutes = math.floor((endTime - info.start) / 60)
+        local discordId = GetDiscordId(id)
+        local endpoint = GetPlayerEndpoint(id) or 'N/A'
+        local embed = BuildDutyEmbed(16711680, '🔴 Duty Clocked Out', {
+            {name = 'Player', value = GetPlayerName(id), inline = true},
+            {name = 'Blip Tag', value = info.label, inline = true},
+            {name = 'Clock In', value = os.date('%Y-%m-%d %H:%M:%S', info.start), inline = false},
+            {name = 'Clock Out', value = os.date('%Y-%m-%d %H:%M:%S', endTime), inline = false},
+            {name = 'Time On Duty (min)', value = tostring(minutes), inline = true},
+            {name = 'Endpoint', value = endpoint, inline = false},
+            {name = 'Discord', value = discordId and string.format('<@%s> (%s)', discordId, discordId) or 'Not Linked', inline = false},
+        })
+        SendDutyLog(embed)
+    end
+
+    BroadcastBlips()
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+RegisterServerEvent('toolbox:requestBlipTags')
+AddEventHandler('toolbox:requestBlipTags', function()
+    local allowed = GetAllowedBlipTags(source)
+    TriggerClientEvent('toolbox:blipTags', source, allowed)
+end)
+
+-- TOOLBOX BLIPS INTEGRATION
+RegisterServerEvent('toolbox:toggleDuty')
+AddEventHandler('toolbox:toggleDuty', function(tagName)
+    local src = source
+    local allowed = GetAllowedBlipTags(src)
+    local chosen
+    for _, tag in ipairs(allowed) do
+        if tag.name == tagName then
+            chosen = tag
+            break
+        end
+    end
+
+    if not chosen then
+        TriggerClientEvent('toolbox:dutyError', src, 'Insufficient permissions for this tag.')
+        return
+    end
+
+    if DutyPlayers[src] then
+        RemoveDutyPlayer(src, true)
+        TriggerClientEvent('toolbox:dutyState', src, false, chosen.name)
+        return
+    end
+
+    DutyPlayers[src] = {
+        name = chosen.name,
+        label = chosen.label,
+        colour = chosen.colour,
+        start = os.time(),
+        coords = nil
+    }
+
+    local discordId = GetDiscordId(src)
+    local endpoint = GetPlayerEndpoint(src) or 'N/A'
+    local embed = BuildDutyEmbed(65280, '🟢 Duty Clocked In', {
+        {name = 'Player', value = GetPlayerName(src), inline = true},
+        {name = 'Blip Tag', value = chosen.label, inline = true},
+        {name = 'Endpoint', value = endpoint, inline = false},
+        {name = 'Discord', value = discordId and string.format('<@%s> (%s)', discordId, discordId) or 'Not Linked', inline = false},
+    })
+    SendDutyLog(embed)
+
+    TriggerClientEvent('toolbox:dutyState', src, true, chosen.name)
+    BroadcastBlips()
+end)
+
+-- TOOLBOX BLIPS INTEGRATION
+RegisterServerEvent('toolbox:updateDutyCoords')
+AddEventHandler('toolbox:updateDutyCoords', function(coords)
+    if DutyPlayers[source] then
+        DutyPlayers[source].coords = coords
+        BroadcastBlips()
+    end
+end)
+
+-- TOOLBOX BLIPS INTEGRATION
+AddEventHandler('playerDropped', function()
+    RemoveDutyPlayer(source, true)
+end)
+
+-- TOOLBOX BLIPS INTEGRATION
+AddEventHandler('onResourceStop', function(res)
+    if res ~= GetCurrentResourceName() then return end
+    for id, _ in pairs(DutyPlayers) do
+        RemoveDutyPlayer(id, false)
+    end
+end)
+
 local LEODeptAcePerms = {
     'sem_intmenu.leo',
     'sem_intmenu.leo.lapd',
@@ -159,24 +333,6 @@ AddEventHandler('SEM_InteractionMenu:FirePerms', function()
 	else
 		TriggerClientEvent('SEM_InteractionMenu:FirePermsResult', source, false)
 	end
-end)
-
-RegisterServerEvent('SEM_InteractionMenu:CheckDutyPerms')
-AddEventHandler('SEM_InteractionMenu:CheckDutyPerms', function(Department)
-    local Dept = (Department or ''):lower()
-    local Allowed = false
-
-    if Dept == 'fire' then
-        Allowed = IsPlayerAceAllowed(source, 'sem_intmenu.fire')
-    elseif Dept == 'lapd' or Dept == 'lasd' or Dept == 'chp' then
-        local AceList = {
-            'sem_intmenu.leo',
-            string.format('sem_intmenu.leo.%s', Dept),
-        }
-        Allowed = HasAnyAce(source, AceList)
-    end
-
-    TriggerClientEvent('SEM_InteractionMenu:DutyPermsResult', source, Dept, Allowed)
 end)
 
 RegisterServerEvent('SEM_InteractionMenu:UnjailPerms')
