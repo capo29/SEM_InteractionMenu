@@ -19,24 +19,6 @@ AddEventHandler('SEM_InteractionMenu:GlobalChat', function(Color, Prefix, Messag
 	TriggerClientEvent('chatMessage', -1, Prefix, Color, Message)
 end)
 
-RegisterServerEvent('SEM_InteractionMenu:CuffNear')
-AddEventHandler('SEM_InteractionMenu:CuffNear', function(ID)
-	if ID == -1 or ID == '-1' then
-		if source ~= '' then
-			print('^1[#' .. source .. '] ' .. GetPlayerName(source) .. '  -  attempted to cuff all players^7')
-			DropPlayer(source, '\n[SEM_InteractionMenu] Attempting to cuff all players')
-		else
-			print('^1Someone attempted to cuff all players^7')
-		end
-
-		return
-	end
-
-	if ID ~= false then
-		TriggerClientEvent('SEM_InteractionMenu:Cuff', ID)
-	end
-end)
-
 RegisterServerEvent('SEM_InteractionMenu:DragNear')
 AddEventHandler('SEM_InteractionMenu:DragNear', function(ID)
 	if ID == -1 or ID == '-1' then

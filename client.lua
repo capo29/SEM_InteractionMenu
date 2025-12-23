@@ -14,58 +14,6 @@
 
 
 
---Cuffing Event
-local isCuffed = false
-RegisterNetEvent('SEM_InteractionMenu:Cuff')
-AddEventHandler('SEM_InteractionMenu:Cuff', function()
-	local Ped = PlayerPedId()
-	if (DoesEntityExist(Ped)) then
-		Citizen.CreateThread(function()
-            RequestAnimDict('mp_arresting')
-            while not HasAnimDictLoaded('mp_arresting') do
-                Citizen.Wait(0)
-            end
-
-            if isCuffed then
-                isCuffed = false
-                Citizen.Wait(500)
-                SetEnableHandcuffs(Ped, false)
-                ClearPedTasksImmediately(Ped)
-            else
-                isCuffed = true
-				SetEnableHandcuffs(Ped, true)
-				TaskPlayAnim(Ped, 'mp_arresting', 'idle', 8.0, -8, -1, 49, 0, 0, 0, 0)
-            end
-		end)
-	end
-end)
-
---Cuff Animation & Restructions
-Citizen.CreateThread(function()
-	while true do
-		Citizen.Wait(1)
-
-        if isCuffed then
-            if not IsEntityPlayingAnim(GetPlayerPed(PlayerId()), 'mp_arresting', 'idle', 3) then
-                TaskPlayAnim(GetPlayerPed(PlayerId()), 'mp_arresting', 'idle', 8.0, -8, -1, 49, 0, 0, 0, 0)
-            end
-
-            SetCurrentPedWeapon(PlayerPedId(), 'weapon_unarmed', true)
-            
-            if not Config.VehEnterCuffed then
-                DisableControlAction(1, 23, true) --F | Enter Vehicle
-                DisableControlAction(1, 75, true) --F | Exit Vehicle
-            end
-			DisableControlAction(1, 140, true) --R
-			DisableControlAction(1, 141, true) --Q
-			DisableControlAction(1, 142, true) --LMB
-			SetPedPathCanUseLadders(GetPlayerPed(PlayerId()), false)
-			if IsPedInAnyVehicle(GetPlayerPed(PlayerId()), false) then
-				DisableControlAction(0, 59, true) --Vehicle Driving
-			end
-		end
-	end
-end)
 
 
 
@@ -599,7 +547,6 @@ Citizen.CreateThread(function()
     TriggerEvent('chat:addSuggestion', '/hood', 'Toggles Vehicle\'s Hood')
     TriggerEvent('chat:addSuggestion', '/trunk', 'Toggles Vehicle\'s Trunk')
     TriggerEvent('chat:addSuggestion', '/clear', 'Clears all Weapons')
-    TriggerEvent('chat:addSuggestion', '/cuff', 'Cuff Player', {{name = 'ID', help = 'Players Server ID'}})
     TriggerEvent('chat:addSuggestion', '/drag', 'Drag Player', {{name = 'ID', help = 'Players Server ID'}})
     TriggerEvent('chat:addSuggestion', '/dropweapon', 'Drops Weapon in Hand')
     TriggerEvent('chat:addSuggestion', '/loadout', 'Equips LEO Weapon Loadout')
@@ -609,21 +556,28 @@ Citizen.CreateThread(function()
         TriggerEvent('chat:addSuggestion', '/radar', 'Toggle Radar Menu')
     end
 
-    if Config.LEOAccess == 3 or Config.FireAccess == 3 then
+    if Config.LEOAccess == 3 or Config.LEOAccess == 5 or Config.FireAccess == 3 then
         if Config.OndutyPSWDActive then
             TriggerEvent('chat:addSuggestion', '/onduty', 'Enable LEO/Fire Menu', {{name = 'Department', help = 'LEO or Fire'}, {name = 'Password', help = 'Onduty Password'}})
+            TriggerEvent('chat:addSuggestion', '/duty', 'Enable LEO/Fire Menu', {{name = 'Department', help = 'LEO or Fire'}, {name = 'Password', help = 'Onduty Password'}})
         else
             TriggerEvent('chat:addSuggestion', '/onduty', 'Enable LEO/Fire Menu', {{name = 'Department', help = 'LEO or Fire'}})
+            TriggerEvent('chat:addSuggestion', '/duty', 'Enable LEO/Fire Menu', {{name = 'Department', help = 'LEO or Fire'}})
         end
     else
         TriggerEvent('chat:removeSuggestion', '/onduty')
+        TriggerEvent('chat:removeSuggestion', '/duty')
     end
 end)
 
 LEOOnduty = false
 FireOnduty = false
-RegisterCommand('onduty', function(source, args, rawCommand)
-    if Config.LEOAccess == 3 or Config.FireAccess == 3 then
+local function HandleOndutyCommand(args)
+    if Config.LEOAccess == 3 or Config.LEOAccess == 5 or Config.FireAccess == 3 then
+        if args[1] == nil then
+            Notify('~r~Invalid Department!')
+            return
+        end
         if Config.OndutyPSWDActive then
             if args[2] == Config.OndutyPSWD then
                 local Department = args[1]:lower()
@@ -668,6 +622,13 @@ RegisterCommand('onduty', function(source, args, rawCommand)
             end
         end
     end
+end
+
+RegisterCommand('onduty', function(source, args, rawCommand)
+    HandleOndutyCommand(args)
+end)
+RegisterCommand('duty', function(source, args, rawCommand)
+    HandleOndutyCommand(args)
 end)
 
 function IsOndutyLEO()
@@ -676,27 +637,6 @@ end
 function IsOndutyFire()
     return FireOnduty
 end
-
-RegisterCommand('cuff', function(source, args, rawCommand)
-    if LEORestrict() or FireRestrict() then
-        if args[1] ~= nil then
-            local ID = tonumber(args[1])
-            if Config.CommandDistanceChecked then
-                if GetDistance(source) < Config.CommandDistance then
-                    TriggerServerEvent('SEM_InteractionMenu:CuffNear', ID)
-                else
-                    Notify('~r~That player is too far away')
-                end
-            else
-                TriggerServerEvent('SEM_InteractionMenu:CuffNear', ID)
-            end
-        else
-            TriggerServerEvent('SEM_InteractionMenu:CuffNear', GetClosestPlayer())
-        end
-    else
-        Notify('~r~Insufficient Permissions')
-    end
-end)
 
 RegisterCommand('drag', function(source, args, rawCommand)
     if LEORestrict() or FireRestrict() then

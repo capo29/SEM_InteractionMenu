@@ -404,6 +404,8 @@ function LEORestrict()
         return LEOOnduty
     elseif Config.LEOAccess == 4 then
         return LEOAce
+    elseif Config.LEOAccess == 5 then
+        return LEOAce and LEOOnduty
     else
         return true
     end
