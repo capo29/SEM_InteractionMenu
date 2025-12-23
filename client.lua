@@ -502,6 +502,15 @@ end)
 
 
 
+--Duty Permission Checks
+local DutyPermsResults = {}
+RegisterNetEvent('SEM_InteractionMenu:DutyPermsResult')
+AddEventHandler('SEM_InteractionMenu:DutyPermsResult', function(Department, Allowed)
+    DutyPermsResults[Department] = Allowed
+end)
+
+
+
 --Emote
 Citizen.CreateThread(function()
     while true do
@@ -556,13 +565,13 @@ Citizen.CreateThread(function()
         TriggerEvent('chat:addSuggestion', '/radar', 'Toggle Radar Menu')
     end
 
-    if Config.LEOAccess == 3 or Config.LEOAccess == 5 or Config.FireAccess == 3 then
+    if Config.LEOAccess == 3 or Config.LEOAccess == 5 or Config.FireAccess == 3 or Config.FireAccess == 5 then
         if Config.OndutyPSWDActive then
-            TriggerEvent('chat:addSuggestion', '/onduty', 'Enable LEO/Fire Menu', {{name = 'Department', help = 'LEO or Fire'}, {name = 'Password', help = 'Onduty Password'}})
-            TriggerEvent('chat:addSuggestion', '/duty', 'Enable LEO/Fire Menu', {{name = 'Department', help = 'LEO or Fire'}, {name = 'Password', help = 'Onduty Password'}})
+            TriggerEvent('chat:addSuggestion', '/onduty', 'Enable Department Menu (lapd/lasd/chp/fire)', {{name = 'Department', help = 'lapd / lasd / chp / fire'}, {name = 'Password', help = 'Onduty Password'}})
+            TriggerEvent('chat:addSuggestion', '/duty', 'Enable Department Menu (lapd/lasd/chp/fire)', {{name = 'Department', help = 'lapd / lasd / chp / fire'}, {name = 'Password', help = 'Onduty Password'}})
         else
-            TriggerEvent('chat:addSuggestion', '/onduty', 'Enable LEO/Fire Menu', {{name = 'Department', help = 'LEO or Fire'}})
-            TriggerEvent('chat:addSuggestion', '/duty', 'Enable LEO/Fire Menu', {{name = 'Department', help = 'LEO or Fire'}})
+            TriggerEvent('chat:addSuggestion', '/onduty', 'Enable Department Menu (lapd/lasd/chp/fire)', {{name = 'Department', help = 'lapd / lasd / chp / fire'}})
+            TriggerEvent('chat:addSuggestion', '/duty', 'Enable Department Menu (lapd/lasd/chp/fire)', {{name = 'Department', help = 'lapd / lasd / chp / fire'}})
         end
     else
         TriggerEvent('chat:removeSuggestion', '/onduty')
@@ -572,21 +581,60 @@ end)
 
 LEOOnduty = false
 FireOnduty = false
+local ValidLEODepartments = {
+    lapd = true,
+    lasd = true,
+    chp = true,
+}
+
+local function HasDutyPermission(Department)
+    local Dept = (Department or ''):lower()
+    DutyPermsResults[Dept] = nil
+    TriggerServerEvent('SEM_InteractionMenu:CheckDutyPerms', Dept)
+
+    local Timeout = GetGameTimer() + 2000
+    while DutyPermsResults[Dept] == nil and GetGameTimer() < Timeout do
+        Citizen.Wait(0)
+    end
+
+    return DutyPermsResults[Dept] == true
+end
+
 local function HandleOndutyCommand(args)
-    if Config.LEOAccess == 3 or Config.LEOAccess == 5 or Config.FireAccess == 3 then
+    if Config.LEOAccess == 3 or Config.LEOAccess == 5 or Config.FireAccess == 3 or Config.FireAccess == 5 then
         if args[1] == nil then
             Notify('~r~Invalid Department!')
             return
         end
+        local Department = args[1]:lower()
+
+        if ValidLEODepartments[Department] then
+            if not HasDutyPermission(Department) then
+                Notify('~r~Insufficient Permissions')
+                return
+            end
+        elseif Department == 'fire' then
+            if Config.FireAccess == 0 then
+                Notify('~r~Invalid Department!')
+                return
+            end
+            if not HasDutyPermission(Department) then
+                Notify('~r~Insufficient Permissions')
+                return
+            end
+        else
+            Notify('~r~Invalid Department!')
+            return
+        end
+
         if Config.OndutyPSWDActive then
             if args[2] == Config.OndutyPSWD then
-                local Department = args[1]:lower()
-                if Department == 'leo' then
+                if ValidLEODepartments[Department] then
                     LEOOnduty = not LEOOnduty
                     if LEOOnduty then
-                        Notify('~g~You are onduty as an LEO')
+                        Notify('~g~You are onduty as ' .. Department:upper())
                     else
-                        Notify('~o~You are no longer onduty as an LEO')
+                        Notify('~o~You are no longer onduty as ' .. Department:upper())
                     end
                 elseif Department == 'fire' then
                     FireOnduty = not FireOnduty
@@ -602,13 +650,12 @@ local function HandleOndutyCommand(args)
                 Notify('~r~Incorrect Password')
             end
         else
-            local Department = args[1]:lower()
-            if Department == 'leo' then
+            if ValidLEODepartments[Department] then
                 LEOOnduty = not LEOOnduty
                 if LEOOnduty then
-                    Notify('~g~You are onduty as an LEO')
+                    Notify('~g~You are onduty as ' .. Department:upper())
                 else
-                    Notify('~o~You are no longer onduty as an LEO')
+                    Notify('~o~You are no longer onduty as ' .. Department:upper())
                 end
             elseif Department == 'fire' then
                 FireOnduty = not FireOnduty

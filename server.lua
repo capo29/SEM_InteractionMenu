@@ -19,6 +19,23 @@ AddEventHandler('SEM_InteractionMenu:GlobalChat', function(Color, Prefix, Messag
 	TriggerClientEvent('chatMessage', -1, Prefix, Color, Message)
 end)
 
+local LEODeptAcePerms = {
+    'sem_intmenu.leo',
+    'sem_intmenu.leo.lapd',
+    'sem_intmenu.leo.lasd',
+    'sem_intmenu.leo.chp',
+}
+
+local function HasAnyAce(source, perms)
+    for _, ace in ipairs(perms) do
+        if IsPlayerAceAllowed(source, ace) then
+            return true
+        end
+    end
+
+    return false
+end
+
 RegisterServerEvent('SEM_InteractionMenu:DragNear')
 AddEventHandler('SEM_InteractionMenu:DragNear', function(ID)
 	if ID == -1 or ID == '-1' then
@@ -128,7 +145,7 @@ end)
 
 RegisterServerEvent('SEM_InteractionMenu:LEOPerms')
 AddEventHandler('SEM_InteractionMenu:LEOPerms', function()
-    if IsPlayerAceAllowed(source, 'sem_intmenu.leo') then
+    if HasAnyAce(source, LEODeptAcePerms) then
 		TriggerClientEvent('SEM_InteractionMenu:LEOPermsResult', source, true)
 	else
 		TriggerClientEvent('SEM_InteractionMenu:LEOPermsResult', source, false)
@@ -142,6 +159,24 @@ AddEventHandler('SEM_InteractionMenu:FirePerms', function()
 	else
 		TriggerClientEvent('SEM_InteractionMenu:FirePermsResult', source, false)
 	end
+end)
+
+RegisterServerEvent('SEM_InteractionMenu:CheckDutyPerms')
+AddEventHandler('SEM_InteractionMenu:CheckDutyPerms', function(Department)
+    local Dept = (Department or ''):lower()
+    local Allowed = false
+
+    if Dept == 'fire' then
+        Allowed = IsPlayerAceAllowed(source, 'sem_intmenu.fire')
+    elseif Dept == 'lapd' or Dept == 'lasd' or Dept == 'chp' then
+        local AceList = {
+            'sem_intmenu.leo',
+            string.format('sem_intmenu.leo.%s', Dept),
+        }
+        Allowed = HasAnyAce(source, AceList)
+    end
+
+    TriggerClientEvent('SEM_InteractionMenu:DutyPermsResult', source, Dept, Allowed)
 end)
 
 RegisterServerEvent('SEM_InteractionMenu:UnjailPerms')

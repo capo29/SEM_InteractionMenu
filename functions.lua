@@ -432,6 +432,8 @@ function FireRestrict()
         return FireOnduty
     elseif Config.FireAccess == 4 then
         return FireAce
+    elseif Config.FireAccess == 5 then
+        return FireAce and FireOnduty
     else
         return true
     end

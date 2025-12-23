@@ -335,8 +335,8 @@ Config.DisplayTrafficManager = true
 
 --This sets who can access the Fire menu
 --!!! NOTE: If Fire Peds is selected then onlys peds from the Config.FireUniforms will have access to the menu
---Disabled = 0 | Everyone = 1 [Default]  |  Fire Peds = 2  |  Onduty Command = 3  |  Ace Permissions = 4
-Config.FireAccess = 1
+--Disabled = 0 | Everyone = 1  |  Fire Peds = 2  |  Onduty Command = 3  |  Ace Permissions = 4  |  Ace & Onduty Command = 5 [Default]
+Config.FireAccess = 5
 
 --This sets if the Hospitalize functions will be visible in the menu
 Config.FireHospital = true
