@@ -56,6 +56,30 @@ Config.MenuTitle = 0
 Config.MenuTitleCustom = 'Custom Menu Title'
 
 
+---------------------------------------------------------------
+--                                                           --
+--               Toolbox Emergency Blips Config             --
+--                                                           --
+---------------------------------------------------------------
+
+-- TOOLBOX BLIPS INTEGRATION
+-- Discord Webhook URL for duty logs (embeds)
+Config.DiscordDutyWebhook = ''
+
+-- TOOLBOX BLIPS INTEGRATION
+-- Blip tags and ACE permissions (DiscordAcePerms / Badger_Discord_API compatible)
+-- name = internal tag, label = menu label, ace = permission string, colour = blip colour id
+Config.BlipTags = {
+    {name = 'lspd', label = 'LSPD', ace = 'toolbox.blips.lspd', colour = 29},
+    {name = 'chp', label = 'CHP', ace = 'toolbox.blips.chp', colour = 38},
+    {name = 'lafd', label = 'LAFD', ace = 'toolbox.blips.lafd', colour = 1},
+}
+
+-- TOOLBOX BLIPS INTEGRATION
+-- Blip update interval (ms) for clients to refresh duty blips
+Config.BlipUpdateInterval = 5000
+
+
 
 
 
@@ -147,8 +171,8 @@ Config.Props = {
 
 --This sets who can access the LEO menu
 --!!! NOTE: If LEO Peds is selected then onlys peds from the Config.LEOUniforms will have access to the menu
---Disabled = 0 | Everyone = 1 [Default]  |  LEO Peds = 2  |  Onduty Command = 3  |  Ace Permissions = 4
-Config.LEOAccess = 1
+--Disabled = 0 | Everyone = 1  |  LEO Peds = 2  |  Onduty Command = 3  |  Ace Permissions = 4  |  Ace & Onduty Command = 5 [Default]
+Config.LEOAccess = 5
 
 --This determines if the radar button will be displayed
 --NOTE: Wraith Radar is the ONLY radar script that works with the menu at the moment (This also includes any editied version) - Both his old and new radar are compatiable, link below
@@ -335,8 +359,8 @@ Config.DisplayTrafficManager = true
 
 --This sets who can access the Fire menu
 --!!! NOTE: If Fire Peds is selected then onlys peds from the Config.FireUniforms will have access to the menu
---Disabled = 0 | Everyone = 1 [Default]  |  Fire Peds = 2  |  Onduty Command = 3  |  Ace Permissions = 4
-Config.FireAccess = 1
+--Disabled = 0 | Everyone = 1  |  Fire Peds = 2  |  Onduty Command = 3  |  Ace Permissions = 4  |  Ace & Onduty Command = 5 [Default]
+Config.FireAccess = 5
 
 --This sets if the Hospitalize functions will be visible in the menu
 Config.FireHospital = true

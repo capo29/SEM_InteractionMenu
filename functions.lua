@@ -404,6 +404,8 @@ function LEORestrict()
         return LEOOnduty
     elseif Config.LEOAccess == 4 then
         return LEOAce
+    elseif Config.LEOAccess == 5 then
+        return LEOAce and LEOOnduty
     else
         return true
     end
@@ -430,6 +432,8 @@ function FireRestrict()
         return FireOnduty
     elseif Config.FireAccess == 4 then
         return FireAce
+    elseif Config.FireAccess == 5 then
+        return FireAce and FireOnduty
     else
         return true
     end

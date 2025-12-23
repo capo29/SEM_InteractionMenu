@@ -14,59 +14,142 @@
 
 
 
---Cuffing Event
-local isCuffed = false
-RegisterNetEvent('SEM_InteractionMenu:Cuff')
-AddEventHandler('SEM_InteractionMenu:Cuff', function()
-	local Ped = PlayerPedId()
-	if (DoesEntityExist(Ped)) then
-		Citizen.CreateThread(function()
-            RequestAnimDict('mp_arresting')
-            while not HasAnimDictLoaded('mp_arresting') do
-                Citizen.Wait(0)
-            end
 
-            if isCuffed then
-                isCuffed = false
-                Citizen.Wait(500)
-                SetEnableHandcuffs(Ped, false)
-                ClearPedTasksImmediately(Ped)
-            else
-                isCuffed = true
-				SetEnableHandcuffs(Ped, true)
-				TaskPlayAnim(Ped, 'mp_arresting', 'idle', 8.0, -8, -1, 49, 0, 0, 0, 0)
-            end
-		end)
-	end
+
+
+-- TOOLBOX BLIPS INTEGRATION
+local DutyActive = false
+local SelectedBlipTag = nil
+local AllowedBlipTags = {}
+local DutyStartTime = nil
+local DutyBlips = {}
+_G.SelectedBlipTag = SelectedBlipTag
+
+-- TOOLBOX BLIPS INTEGRATION
+local function NotifyDuty(msg)
+    Notify(msg)
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+function GetAllowedBlipTags()
+    return AllowedBlipTags
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+function SetSelectedBlipTag(tagName)
+    for _, tag in ipairs(AllowedBlipTags) do
+        if tag.name == tagName then
+            SelectedBlipTag = tagName
+            _G.SelectedBlipTag = SelectedBlipTag
+            return true
+        end
+    end
+    return false
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+local function RequestBlipTags()
+    TriggerServerEvent('toolbox:requestBlipTags')
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+RegisterNetEvent('toolbox:blipTags')
+AddEventHandler('toolbox:blipTags', function(tags)
+    AllowedBlipTags = tags or {}
+    if #AllowedBlipTags > 0 and not SelectedBlipTag then
+        SelectedBlipTag = AllowedBlipTags[1].name
+    end
+    _G.SelectedBlipTag = SelectedBlipTag
 end)
 
---Cuff Animation & Restructions
+-- TOOLBOX BLIPS INTEGRATION
+local function PerformDutyToggle()
+    if not SelectedBlipTag then
+        NotifyDuty('~r~Select a blip tag first')
+        return
+    end
+    TriggerServerEvent('toolbox:toggleDuty', SelectedBlipTag)
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+RegisterNetEvent('toolbox:dutyState')
+AddEventHandler('toolbox:dutyState', function(state, tag)
+    DutyActive = state
+    if state then
+        DutyStartTime = GetGameTimer()
+        NotifyDuty('~g~Duty Enabled [' .. tag .. ']')
+        if tag == 'lafd' then
+            FireOnduty = true
+            LEOOnduty = false
+        else
+            LEOOnduty = true
+            FireOnduty = false
+        end
+    else
+        NotifyDuty('~o~Duty Disabled')
+        DutyStartTime = nil
+        LEOOnduty = false
+        FireOnduty = false
+    end
+end)
+
+-- TOOLBOX BLIPS INTEGRATION
+RegisterNetEvent('toolbox:dutyError')
+AddEventHandler('toolbox:dutyError', function(msg)
+    NotifyDuty('~r~' .. msg)
+end)
+
+-- TOOLBOX BLIPS INTEGRATION
 Citizen.CreateThread(function()
-	while true do
-		Citizen.Wait(1)
-
-        if isCuffed then
-            if not IsEntityPlayingAnim(GetPlayerPed(PlayerId()), 'mp_arresting', 'idle', 3) then
-                TaskPlayAnim(GetPlayerPed(PlayerId()), 'mp_arresting', 'idle', 8.0, -8, -1, 49, 0, 0, 0, 0)
-            end
-
-            SetCurrentPedWeapon(PlayerPedId(), 'weapon_unarmed', true)
-            
-            if not Config.VehEnterCuffed then
-                DisableControlAction(1, 23, true) --F | Enter Vehicle
-                DisableControlAction(1, 75, true) --F | Exit Vehicle
-            end
-			DisableControlAction(1, 140, true) --R
-			DisableControlAction(1, 141, true) --Q
-			DisableControlAction(1, 142, true) --LMB
-			SetPedPathCanUseLadders(GetPlayerPed(PlayerId()), false)
-			if IsPedInAnyVehicle(GetPlayerPed(PlayerId()), false) then
-				DisableControlAction(0, 59, true) --Vehicle Driving
-			end
-		end
-	end
+    RequestBlipTags()
+    while true do
+        Citizen.Wait(Config.BlipUpdateInterval)
+        if DutyActive then
+            local coords = GetEntityCoords(PlayerPedId())
+            TriggerServerEvent('toolbox:updateDutyCoords', {x = coords.x, y = coords.y, z = coords.z, heading = GetEntityHeading(PlayerPedId())})
+        end
+    end
 end)
 
+-- TOOLBOX BLIPS INTEGRATION
+local function ClearDutyBlips()
+    for id, blip in pairs(DutyBlips) do
+        RemoveBlip(blip)
+        DutyBlips[id] = nil
+    end
+end
+
+-- TOOLBOX BLIPS INTEGRATION
+RegisterNetEvent('eblips:updateAll')
+AddEventHandler('eblips:updateAll', function(list)
+    ClearDutyBlips()
+    if not list then return end
+    local myId = GetPlayerServerId(PlayerId())
+    for _, info in ipairs(list) do
+        if info.id ~= myId then
+            local blip = AddBlipForCoord(info.coords.x, info.coords.y, info.coords.z)
+            SetBlipSprite(blip, 1)
+            SetBlipColour(blip, info.colour or 0)
+            SetBlipDisplay(blip, 4)
+            SetBlipScale(blip, 0.85)
+            SetBlipAsShortRange(blip, true)
+            SetBlipShowCone(blip, true)
+            BeginTextCommandSetBlipName('STRING')
+            AddTextComponentString(info.name)
+            EndTextCommandSetBlipName(blip)
+            DutyBlips[info.id] = blip
+        end
+    end
+end)
+
+-- TOOLBOX BLIPS INTEGRATION
+RegisterNetEvent('eblips:remove')
+AddEventHandler('eblips:remove', function(id)
+    if DutyBlips[id] then
+        RemoveBlip(DutyBlips[id])
+        DutyBlips[id] = nil
+    end
+end)
 
 
 --Dragging Event
@@ -599,7 +682,6 @@ Citizen.CreateThread(function()
     TriggerEvent('chat:addSuggestion', '/hood', 'Toggles Vehicle\'s Hood')
     TriggerEvent('chat:addSuggestion', '/trunk', 'Toggles Vehicle\'s Trunk')
     TriggerEvent('chat:addSuggestion', '/clear', 'Clears all Weapons')
-    TriggerEvent('chat:addSuggestion', '/cuff', 'Cuff Player', {{name = 'ID', help = 'Players Server ID'}})
     TriggerEvent('chat:addSuggestion', '/drag', 'Drag Player', {{name = 'ID', help = 'Players Server ID'}})
     TriggerEvent('chat:addSuggestion', '/dropweapon', 'Drops Weapon in Hand')
     TriggerEvent('chat:addSuggestion', '/loadout', 'Equips LEO Weapon Loadout')
@@ -609,65 +691,14 @@ Citizen.CreateThread(function()
         TriggerEvent('chat:addSuggestion', '/radar', 'Toggle Radar Menu')
     end
 
-    if Config.LEOAccess == 3 or Config.FireAccess == 3 then
-        if Config.OndutyPSWDActive then
-            TriggerEvent('chat:addSuggestion', '/onduty', 'Enable LEO/Fire Menu', {{name = 'Department', help = 'LEO or Fire'}, {name = 'Password', help = 'Onduty Password'}})
-        else
-            TriggerEvent('chat:addSuggestion', '/onduty', 'Enable LEO/Fire Menu', {{name = 'Department', help = 'LEO or Fire'}})
-        end
-    else
-        TriggerEvent('chat:removeSuggestion', '/onduty')
-    end
+    TriggerEvent('chat:addSuggestion', '/duty', 'Toggle duty for your assigned blip tag')
 end)
 
 LEOOnduty = false
 FireOnduty = false
-RegisterCommand('onduty', function(source, args, rawCommand)
-    if Config.LEOAccess == 3 or Config.FireAccess == 3 then
-        if Config.OndutyPSWDActive then
-            if args[2] == Config.OndutyPSWD then
-                local Department = args[1]:lower()
-                if Department == 'leo' then
-                    LEOOnduty = not LEOOnduty
-                    if LEOOnduty then
-                        Notify('~g~You are onduty as an LEO')
-                    else
-                        Notify('~o~You are no longer onduty as an LEO')
-                    end
-                elseif Department == 'fire' then
-                    FireOnduty = not FireOnduty
-                    if FireOnduty == true then
-                        Notify('~g~You are onduty as an Firefighter')
-                    else
-                        Notify('~o~You are no longer onduty as an Firefighter')
-                    end
-                else
-                    Notify('~r~Invalid Department!')
-                end
-            else
-                Notify('~r~Incorrect Password')
-            end
-        else
-            local Department = args[1]:lower()
-            if Department == 'leo' then
-                LEOOnduty = not LEOOnduty
-                if LEOOnduty then
-                    Notify('~g~You are onduty as an LEO')
-                else
-                    Notify('~o~You are no longer onduty as an LEO')
-                end
-            elseif Department == 'fire' then
-                FireOnduty = not FireOnduty
-                if FireOnduty == true then
-                    Notify('~g~You are onduty as an Firefighter')
-                else
-                    Notify('~o~You are no longer onduty as an Firefighter')
-                end
-            else
-                Notify('~r~Invalid Department!')
-            end
-        end
-    end
+
+RegisterCommand('duty', function(source, args, rawCommand)
+    PerformDutyToggle()
 end)
 
 function IsOndutyLEO()
@@ -676,27 +707,6 @@ end
 function IsOndutyFire()
     return FireOnduty
 end
-
-RegisterCommand('cuff', function(source, args, rawCommand)
-    if LEORestrict() or FireRestrict() then
-        if args[1] ~= nil then
-            local ID = tonumber(args[1])
-            if Config.CommandDistanceChecked then
-                if GetDistance(source) < Config.CommandDistance then
-                    TriggerServerEvent('SEM_InteractionMenu:CuffNear', ID)
-                else
-                    Notify('~r~That player is too far away')
-                end
-            else
-                TriggerServerEvent('SEM_InteractionMenu:CuffNear', ID)
-            end
-        else
-            TriggerServerEvent('SEM_InteractionMenu:CuffNear', GetClosestPlayer())
-        end
-    else
-        Notify('~r~Insufficient Permissions')
-    end
-end)
 
 RegisterCommand('drag', function(source, args, rawCommand)
     if LEORestrict() or FireRestrict() then

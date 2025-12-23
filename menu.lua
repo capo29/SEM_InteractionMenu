@@ -54,6 +54,34 @@ function Menu()
 	
 	MainMenu:SetMenuWidthOffset(Config.MenuWidth)	
 	_MenuPool:ControlDisablingEnabled(false)
+    -- TOOLBOX BLIPS INTEGRATION
+    local AllowedBlipTags = GetAllowedBlipTags()
+    if #AllowedBlipTags > 0 then
+        local TagLabels = {}
+        local DefaultIndex = 1
+        for idx, Tag in ipairs(AllowedBlipTags) do
+            table.insert(TagLabels, Tag.label)
+            if Tag.name == SelectedBlipTag then
+                DefaultIndex = idx
+            end
+        end
+        local BlipMenu = _MenuPool:AddSubMenu(MainMenu, 'Emergency Blips', '', true)
+        BlipMenu:SetMenuWidthOffset(Config.MenuWidth)
+            local ToggleDuty = NativeUI.CreateItem('Toggle Duty', 'Toggle duty status')
+            local SelectTag = NativeUI.CreateListItem('Select Blip Tag', TagLabels, DefaultIndex, 'Choose your duty blip tag')
+            BlipMenu:AddItem(ToggleDuty)
+            BlipMenu:AddItem(SelectTag)
+            ToggleDuty.Activated = function(ParentMenu, SelectedItem)
+                PerformDutyToggle()
+            end
+            BlipMenu.OnListSelect = function(sender, item, index)
+                if item == SelectTag then
+                    local tagName = AllowedBlipTags[index].name
+                    SetSelectedBlipTag(tagName)
+                end
+            end
+    end
+
 	_MenuPool:MouseControlsEnabled(false)
 
 
@@ -65,7 +93,6 @@ function Menu()
         LEOMenu:SetMenuWidthOffset(Config.MenuWidth)
             local LEOActions = _MenuPool:AddSubMenu(LEOMenu, 'Actions', '', true)
             LEOActions:SetMenuWidthOffset(Config.MenuWidth)
-                local Cuff = NativeUI.CreateItem('Cuff', 'Cuff/Uncuff the closest player')
                 local Drag = NativeUI.CreateItem('Drag', 'Drag/Undrag the closest player')
                 local Seat = NativeUI.CreateItem('Seat', 'Place a player in the closest vehicle')
                 local Unseat = NativeUI.CreateItem('Unseat', 'Remove a player from the closest vehicle')
@@ -86,7 +113,8 @@ function Menu()
                 end
                 local Props = NativeUI.CreateListItem('Spawn Props', PropsList, 1, 'Spawn props on the ground')
                 local RemoveProps = NativeUI.CreateItem('Remove Props', 'Remove the closest prop')
-                LEOActions:AddItem(Cuff)
+                local SmartCuff = NativeUI.CreateItem('SmartCuffs', 'Toggle cuffs using the SmartCuffs resource')
+                LEOActions:AddItem(SmartCuff)
                 LEOActions:AddItem(Drag)
                 LEOActions:AddItem(Seat)
                 LEOActions:AddItem(Unseat)
@@ -112,11 +140,8 @@ function Menu()
                     LEOActions:AddItem(Props)
                     LEOActions:AddItem(RemoveProps)
                 end
-                Cuff.Activated = function(ParentMenu, SelectedItem)
-                    local player = GetClosestPlayer()
-                    if player ~= false then
-                        TriggerServerEvent('SEM_InteractionMenu:CuffNear', player)
-                    end
+                SmartCuff.Activated = function(ParentMenu, SelectedItem)
+                    ExecuteCommand('cuff')
                 end
                 Drag.Activated = function(ParentMenu, SelectedItem)
                     local player = GetClosestPlayer()
